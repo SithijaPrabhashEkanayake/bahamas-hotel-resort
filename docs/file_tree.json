@@ -1,0 +1,255 @@
+{
+  "project_name": "bahamas-hotel-resort",
+  "root_path": "C:\\Users\\ekana\\OpenBot\\Shared\\projects\\bahamas-hotel-resort",
+  "description": "Enterprise-grade Next.js 14 App Router, TypeScript, Tailwind CSS, and Supabase PostgreSQL property management and resort operations platform for five-star island resorts across The Bahamas.",
+  "structure": {
+    ".env.example": "Configuration template for Supabase credentials, Bahamas VAT TIN, and hotel licensing keys.",
+    ".gitignore": "Standard Next.js, Node, and Supabase git exclusions.",
+    "components.json": "Shadcn UI component configuration using custom Bahamian luxury palette.",
+    "next.config.mjs": "Next.js 14 compiler, asset optimization, and security headers.",
+    "package.json": "Production dependencies (@supabase/ssr, @supabase/supabase-js, framer-motion, lucide-react, zod, tailwindcss, etc.).",
+    "postcss.config.mjs": "PostCSS plugin definitions.",
+    "README.md": "Project setup guide, environment configuration, and architectural references.",
+    "tailwind.config.ts": "Tailwind configuration defining custom palette: #F8FAF8 canvas, #006B7D reef teal, #E07A5F conch pink, #C5A059 island teak, #1A2E35 charcoal.",
+    "tsconfig.json": "Strict TypeScript compiler configuration with @/ path aliases.",
+    "docs": {
+      "input_brief.md": "Initial executive project brief detailing aesthetic architecture and the 7 resort modules.",
+      "DISPATCH_PLAN_AND_TASK_PROMPTS.md": "Skill-bound governance and teammate task dispatch plan.",
+      "architecture.md": "System technical architecture, topology, 25-table Mermaid ER diagram, security model, and component layout.",
+      "schema.sql": "Production-ready PostgreSQL 15+ DDL covering 25 tables, 100% RLS with InitPlan subqueries, composite indexes, and Cable Beach seed data.",
+      "api_contracts.json": "Full OpenAPI 3.0.3 specification with RESTful endpoints and RFC 7807 Problem Details schemas.",
+      "file_tree.json": "Master repository directory and file taxonomy."
+    },
+    "supabase": {
+      "config.toml": "Supabase CLI local development configuration.",
+      "seed.sql": "Complete Bahamian resort seed script populating organizations, properties, suites, rates, staff, and folios.",
+      "migrations": {
+        "20261114000001_initial_schema.sql": "Initial DDL for the 25 resort tables, custom enums, and foreign key relationships.",
+        "20261114000002_rls_policies.sql": "Row Level Security policies with cached InitPlan subqueries (SELECT auth.uid()).",
+        "20261114000003_functions_triggers.sql": "Stored procedures for room collision detection, maintenance OOO triage, and Daily Flash Report."
+      }
+    },
+    "src": {
+      "app": {
+        "favicon.ico": "Reef turquoise resort crest icon.",
+        "globals.css": "Tailwind directives, custom scrollbars, and Bahamian color variables.",
+        "layout.tsx": "Root HTML layout injecting modern typography, metadata, and Supabase Auth session provider.",
+        "page.tsx": "Root redirection logic routing users based on user_role (Dashboard, Tape Chart, Housekeeping Mobile, or Login).",
+        "(auth)": {
+          "login": {
+            "page.tsx": "Luxury resort staff login portal supporting email/password, magic link, and role simulation."
+          }
+        },
+        "(dashboard)": {
+          "layout.tsx": "Main dashboard shell housing the executive sidebar, universal guest search bar, and header.",
+          "matrix": {
+            "page.tsx": "Interactive 2D Room Tape Chart (Gantt canvas) plotting physical rooms against dates and operational slots."
+          },
+          "bookings": {
+            "page.tsx": "Resort reservation registry with status filters, date range selection, and VIP badges.",
+            "[id]": {
+              "page.tsx": "Booking detail page featuring check-in/out workflows, digital signature card, and room move trigger."
+            }
+          },
+          "folios": {
+            "[id]": {
+              "page.tsx": "Master guest folio console displaying itemized charges, Bahamas 10% VAT, service charge, and multi-tender settlement."
+            }
+          },
+          "rooms": {
+            "page.tsx": "Physical room inventory directory, category attributes, plunge pool flags, and live housekeeping statuses."
+          },
+          "rates": {
+            "page.tsx": "Dynamic Caribbean yield management console managing High, Shoulder, and Low seasonal rate calendars."
+          },
+          "housekeeping": {
+            "page.tsx": "Housekeeping dispatch dashboard managing departure cleans, daily refreshes, and turndown queues."
+          },
+          "maintenance": {
+            "page.tsx": "Engineering work order triage board with P1/P2/P3 severity pills and automated room OOO tracking."
+          },
+          "pos": {
+            "page.tsx": "Resort F&B POS terminal with instant room folio charge validation and surname verification."
+          },
+          "concierge": {
+            "page.tsx": "Excursion and private yacht charter booking engine with vendor commission splits."
+          },
+          "crm": {
+            "page.tsx": "Guest 360 CRM directory with instant (<150ms) search by name, passport, or phone.",
+            "[id]": {
+              "page.tsx": "Holistic guest profile displaying LTV spend, stay history, dietary preferences, and medical allergy flags."
+            }
+          },
+          "analytics": {
+            "page.tsx": "Executive RevPAR & Occupancy Cockpit featuring the automated Daily Flash Report and midnight audit metrics."
+          }
+        },
+        "(mobile)": {
+          "attendant-portal": {
+            "page.tsx": "Touch-optimized mobile tablet view for room attendants: room status toggles (Dirty -> In-Progress -> Inspected -> Clean)."
+          }
+        },
+        "api": {
+          "v1": {
+            "bookings": {
+              "route.ts": "GET reservations and POST new 15-minute atomic booking hold.",
+              "collision-check": {
+                "route.ts": "POST pre-flight room collision evaluation executing in <5ms."
+              },
+              "[id]": {
+                "route.ts": "GET booking detail, PATCH updates, and DELETE cancellation.",
+                "check-in": {
+                  "route.ts": "POST express check-in with digital signature and keycard RFID UID."
+                },
+                "check-out": {
+                  "route.ts": "POST check-out verification and departure housekeeping queue trigger."
+                },
+                "room-move": {
+                  "route.ts": "POST drag-and-drop room move and baggage transfer notification."
+                }
+              }
+            },
+            "rooms": {
+              "matrix": {
+                "route.ts": "GET 2D tape chart matrix payload for visual Gantt canvas."
+              }
+            },
+            "folios": {
+              "[id]": {
+                "route.ts": "GET itemized folio charges, balances, and multi-tender status.",
+                "transactions": {
+                  "route.ts": "POST charge with Bahamas 10% VAT, 10% Service Charge, and 10% Hotel Levy."
+                },
+                "settle": {
+                  "route.ts": "POST multi-tender settlement with odd-penny preservation algorithm."
+                },
+                "statement": {
+                  "route.ts": "GET certified tax invoice statement stamped with Bahamas Tax TIN."
+                }
+              }
+            },
+            "housekeeping": {
+              "tasks": {
+                "route.ts": "GET housekeeping queue and POST task assignments.",
+                "[id]": {
+                  "route.ts": "PATCH status transitions (dirty -> in_progress -> inspected -> clean)."
+                }
+              }
+            },
+            "maintenance": {
+              "tickets": {
+                "route.ts": "GET work orders and POST issue (P1 urgent triggers room out-of-order)."
+              }
+            },
+            "pos": {
+              "orders": {
+                "[id]": {
+                  "charge-room": {
+                    "route.ts": "POST route F&B check to room folio with mandatory guest surname match."
+                  }
+                }
+              }
+            },
+            "concierge": {
+              "bookings": {
+                "route.ts": "GET and POST private yacht charters and island excursions."
+              }
+            },
+            "analytics": {
+              "flash-report": {
+                "route.ts": "GET executive midnight audit flash report (RevPAR, ADR, OCC%)."
+              }
+            }
+          }
+        }
+      },
+      "components": {
+        "ui": {
+          "alert-dialog.tsx": "Accessible confirmation dialog for irreversible actions.",
+          "badge.tsx": "Status badges styled with Palm Green (#2D6A4F), Conch Pink (#E07A5F), and Crimson (#BC4749).",
+          "button.tsx": "Tactile buttons with smooth elevation and brand color variants.",
+          "card.tsx": "Clean elevated card containers with Crisp Linen (#FFFFFF) ground.",
+          "dialog.tsx": "Modal sheets powered by Radix UI and Framer Motion ease curves.",
+          "dropdown-menu.tsx": "Accessible dropdown actions for tape chart cells and table rows.",
+          "input.tsx": "Clean inputs with Sandstone borders and Reef Teal focus rings.",
+          "select.tsx": "Standardized select dropdowns.",
+          "separator.tsx": "Minimalist dividers.",
+          "table.tsx": "High-density data tables with tabular lining figures.",
+          "tabs.tsx": "Tab navigation with smooth sliding indicators.",
+          "toast.tsx": "Non-intrusive toast notifications.",
+          "tooltip.tsx": "Micro-tooltips explaining statutory levies and room tier codes."
+        },
+        "layout": {
+          "header.tsx": "Top bar with global CRM guest search, active property switcher, and user profile.",
+          "sidebar.tsx": "Minimalist vertical navigation with luxury brand typography and module links.",
+          "mobile-nav.tsx": "Bottom drawer navigation for tablet viewports."
+        },
+        "matrix": {
+          "tape-chart.tsx": "Interactive 2D room grid canvas with drag-and-drop room move support.",
+          "room-row.tsx": "Individual room track displaying tier icon, room number, and operational status.",
+          "date-header.tsx": "Temporal header showing dates, day of week, and daily occupancy percentage.",
+          "booking-block.tsx": "Color-coded booking bar rendering guest name, VIP tier, and check-in status.",
+          "collision-warning.tsx": "High-visibility banner highlighting booking overlaps."
+        },
+        "folios": {
+          "folio-summary.tsx": "Top-level account balance card showing subtotal, taxes, and net due.",
+          "transaction-table.tsx": "Itemized list of room charges, restaurant bills, and excursions.",
+          "multi-tender-modal.tsx": "Split-tender payment modal distributing charges across Cash USD/BSD and Cards.",
+          "tax-breakdown.tsx": "Visual itemization of Bahamas 10% VAT, 10% Service Charge, and 10% Hotel Levy.",
+          "invoice-preview.tsx": "Printable luxury tax invoice preview with Bahamas VAT TIN."
+        },
+        "housekeeping": {
+          "queue-card.tsx": "Room turnover task card with priority flag and estimated cleaning duration.",
+          "status-toggle.tsx": "One-touch button toggling Dirty -> In-Progress -> Clean."
+        },
+        "maintenance": {
+          "ticket-modal.tsx": "Work order creation dialog with category selector and photo uploader.",
+          "severity-pill.tsx": "Visual badge indicating P1 Urgent (OOO trigger), P2 Standard, or P3 Preventative."
+        },
+        "pos": {
+          "outlet-menu.tsx": "Visual touch grid of F&B menu items.",
+          "cart-panel.tsx": "Active order cart with tax and gratuity calculations.",
+          "room-verifier.tsx": "Modal verifying room number and matching guest surname before charge routing."
+        },
+        "analytics": {
+          "flash-report-card.tsx": "Daily Flash Report summary widget with RevPAR, ADR, and Occupancy % gauges.",
+          "revpar-gauge.tsx": "Visual circular meter for Revenue Per Available Room vs. budget target.",
+          "adr-chart.tsx": "Historical line chart comparing Average Daily Rate across Caribbean seasons."
+        }
+      },
+      "lib": {
+        "utils.ts": "Tailwind class merging (clsx, twMerge) and date formatting utilities.",
+        "supabase": {
+          "client.ts": "Client-side Supabase browser client.",
+          "server.ts": "Server-side Supabase client for Server Components using cookies.",
+          "middleware.ts": "Next.js middleware refreshing session and enforcing RBAC route boundaries.",
+          "rls-guard.ts": "Helper verifying user roles (admin, front_desk, concierge, housekeeping, fnb_staff)."
+        },
+        "math": {
+          "tax-calculator.ts": "Pure functions computing exact Bahamas 10% VAT, 10% Service Charge, and 10% Hotel Levy.",
+          "odd-penny.ts": "Odd-penny preservation algorithm ensuring zero cent leakage across split tenders.",
+          "revpar-calculator.ts": "Formulas computing Occupancy %, ADR, RevPAR, and TRevPAR.",
+          "currency.ts": "Dual-currency utilities maintaining strict 1:1 USD to BSD parity."
+        },
+        "validators": {
+          "booking.schema.ts": "Zod schemas for booking creation, collision checks, check-in, and room moves.",
+          "folio.schema.ts": "Zod schemas for folio charge posting, multi-tender settlement, and refunds.",
+          "maintenance.schema.ts": "Zod schemas for engineering work order triage and OOO classification.",
+          "pos.schema.ts": "Zod schemas for F&B outlet orders and room folio charge validations."
+        }
+      },
+      "types": {
+        "database.types.ts": "Auto-generated TypeScript definitions mirroring the 25-table PostgreSQL schema.",
+        "models.ts": "Domain entity models and joined composite interfaces used in React components.",
+        "api.ts": "Request and response DTO types matching api_contracts.json.",
+        "enums.ts": "TypeScript enums for user roles, room tiers, booking statuses, and task states."
+      },
+      "hooks": {
+        "use-room-matrix.ts": "Hook fetching 2D room tape chart data with real-time Supabase subscriptions.",
+        "use-folio.ts": "Hook managing active folio transactions, balances, and multi-tender splits.",
+        "use-crm-search.ts": "Debounced fast search hook querying guest CRM with <150ms response.",
+        "use-flash-report.ts": "Hook fetching executive midnight audit RevPAR and occupancy metrics."
+      }
+    }
+  }
+}

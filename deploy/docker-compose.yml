@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  bahamas-resort-web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: grand-bahamian-resort
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_APP_NAME=The Grand Bahamian Resort & Reserve
+      - NEXT_PUBLIC_APP_URL=http://localhost:3000
+      - NEXT_PUBLIC_BAHAMAS_VAT_RATE=0.10
+      - NEXT_PUBLIC_BAHAMAS_SERVICE_CHARGE_RATE=0.10
+      - NEXT_PUBLIC_BAHAMAS_HOTEL_LEVY_RATE=0.10
+      - NEXT_PUBLIC_BAHAMAS_TIN=100293848-VAT-BS
+      - NEXT_PUBLIC_CURRENCY_DEFAULT=USD
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - bahamas-network
+
+networks:
+  bahamas-network:
+    driver: bridge

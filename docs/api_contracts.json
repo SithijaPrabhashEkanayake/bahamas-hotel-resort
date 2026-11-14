@@ -1,0 +1,838 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Bahamas Luxury Hotel & Resort Management API",
+    "version": "1.0.0",
+    "description": "Enterprise-grade RESTful API contracts and RFC 7807 Problem Details schemas for the Bahamas Luxury Hotel & Resort Management System (`bahamas-hotel-resort`). Compliant with Bahamas 10% VAT, 10% Mandatory Resort Service Charge, 10% Hotel Levy, USD/BSD 1:1 currency parity, odd-penny preservation, atomic booking cart locking, and Row Level Security."
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Next.js 14 App Router Route Handlers"
+    },
+    {
+      "url": "https://pms.oceanpearlbahamas.com/api/v1",
+      "description": "Production Resort Gateway"
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    }
+  ],
+  "tags": [
+    { "name": "Bookings", "description": "Reservation lifecycle, 15-minute checkout cart locking, check-in/out, and room moves" },
+    { "name": "Room Matrix", "description": "Interactive 2D room tape chart and live room status transitions" },
+    { "name": "Rate Engine", "description": "Dynamic Caribbean seasonal yield management and LOS rate calculations" },
+    { "name": "Folio & Billing", "description": "Multi-tender billing, Bahamas 10% VAT, 10% Service Charge, 10% Hotel Levy, and odd-penny preservation" },
+    { "name": "Housekeeping", "description": "Departure cleans, daily refreshes, turndown queues, and inspection status" },
+    { "name": "Maintenance", "description": "P1 urgent issue triage, work order dispatch, and automated Out-of-Order triggers" },
+    { "name": "Resort POS", "description": "F&B outlet order processing and live room folio charge verification with surname match" },
+    { "name": "Guest CRM & Concierge", "description": "Guest 360 dossiers, VIP tiering, and luxury yacht/excursion bookings" },
+    { "name": "Executive Analytics", "description": "RevPAR, ADR, OCC% calculation engine and Daily Flash Reports" }
+  ],
+  "paths": {
+    "/bookings": {
+      "get": {
+        "tags": ["Bookings"],
+        "summary": "Query resort reservations",
+        "parameters": [
+          { "name": "property_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "check_in_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "check_out_date", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/BookingStatus" } },
+          { "name": "room_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of matching booking records.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/BookingDetail" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Create atomic reservation hold",
+        "description": "Initiates reservation hold with 15-minute checkout cart locking to prevent concurrent double-booking.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateBookingDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Booking hold created and confirmed.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BookingDetail" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/bookings/collision-check": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Check room availability and collisions",
+        "description": "Pre-flight atomic verification of physical room and category availability for specified date range.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CollisionCheckDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Collision evaluation result.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CollisionCheckResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/bookings/{id}/check-in": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Process guest check-in",
+        "description": "Registers guest arrival, captures digital signature, validates credit card pre-authorization, and sets room to occupied_clean.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CheckInDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Check-in successful; room status set to occupied_clean.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BookingDetail" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/bookings/{id}/check-out": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Process guest check-out",
+        "description": "Verifies zero folio balance, releases room to vacant_dirty, and queues departure housekeeping task.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check-out completed successfully.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BookingDetail" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" }
+        }
+      }
+    },
+    "/bookings/{id}/room-move": {
+      "post": {
+        "tags": ["Bookings"],
+        "summary": "Execute drag-and-drop room move",
+        "description": "Reassigns guest accommodation, triggers luggage transfer task, and redirects active folio room charges.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RoomMoveDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Room move recorded and accommodations updated.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/BookingDetail" }
+              }
+            }
+          },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      }
+    },
+    "/rooms/matrix": {
+      "get": {
+        "tags": ["Room Matrix"],
+        "summary": "Fetch 2D room tape chart data",
+        "description": "Returns operational matrix of all rooms against dates with color-coded status blocks and active guest details.",
+        "parameters": [
+          { "name": "property_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "start_date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } },
+          { "name": "end_date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matrix canvas payload.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RoomMatrixPayload" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{id}": {
+      "get": {
+        "tags": ["Folio & Billing"],
+        "summary": "Get guest folio account",
+        "description": "Returns itemized folio transactions, taxes (10% VAT, 10% Service, 10% Hotel Levy), and live balance.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Folio summary with itemized charges and payments.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FolioDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{id}/transactions": {
+      "post": {
+        "tags": ["Folio & Billing"],
+        "summary": "Post folio charge",
+        "description": "Posts room, dining, or concierge charges with exact Bahamas 10% VAT, 10% Service Charge, and 10% Hotel Levy calculations.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PostFolioChargeDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Charge posted to folio.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FolioTransaction" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{id}/settle": {
+      "post": {
+        "tags": ["Folio & Billing"],
+        "summary": "Process multi-tender folio settlement",
+        "description": "Settles open balance using split tenders (Cash USD/BSD, Credit Cards, Wire), enforcing odd-penny preservation.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SettleFolioDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Folio settled with zero balance.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FolioDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/folios/{id}/statement": {
+      "get": {
+        "tags": ["Folio & Billing"],
+        "summary": "Generate official tax invoice statement",
+        "description": "Outputs branded PDF receipt data stamped with the official Bahamas Tax Identification Number (TIN).",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Certified invoice payload.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TaxInvoicePayload" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/housekeeping/tasks": {
+      "get": {
+        "tags": ["Housekeeping"],
+        "summary": "List housekeeping queue",
+        "parameters": [
+          { "name": "property_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/TaskStatus" } },
+          { "name": "date", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/HousekeepingTaskDetail" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/maintenance/tickets": {
+      "get": {
+        "tags": ["Maintenance"],
+        "summary": "List engineering work orders",
+        "parameters": [
+          { "name": "property_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "severity", "in": "query", "schema": { "$ref": "#/components/schemas/MaintenanceSeverity" } },
+          { "name": "status", "in": "query", "schema": { "$ref": "#/components/schemas/MaintenanceStatus" } }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/MaintenanceTicketDetail" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Maintenance"],
+        "summary": "Log maintenance issue",
+        "description": "If logged with p1_urgent and causes_ooo=true, automatically triggers room status switch to out_of_order.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateMaintenanceTicketDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MaintenanceTicketDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pos/orders/{id}/charge-room": {
+      "post": {
+        "tags": ["Resort POS"],
+        "summary": "Charge F&B order to room folio",
+        "description": "Verifies guest surname against active in-house booking before posting total F&B ticket to folio.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ChargeRoomFolioDto" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Charge successfully routed to guest folio.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FolioTransaction" }
+              }
+            }
+          },
+          "403": {
+            "description": "Surname verification mismatch or inactive room booking.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/concierge/bookings": {
+      "get": {
+        "tags": ["Guest CRM & Concierge"],
+        "summary": "List excursion and charter bookings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/ConciergeBookingDetail" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Guest CRM & Concierge"],
+        "summary": "Book yacht charter or private excursion",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateConciergeBookingDto" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ConciergeBookingDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analytics/flash-report": {
+      "get": {
+        "tags": ["Executive Analytics"],
+        "summary": "Generate Daily Flash Report",
+        "description": "Calculates RevPAR, ADR, Occupancy %, Room Revenue, F&B Revenue, and total labor ratios.",
+        "parameters": [
+          { "name": "property_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "date", "in": "query", "required": true, "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Executive midnight audit flash report.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DailyFlashReportPayload" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "Supabase Auth JWT carrying user role and organization claims"
+      }
+    },
+    "schemas": {
+      "ProblemDetails": {
+        "type": "object",
+        "required": ["type", "title", "status", "detail"],
+        "properties": {
+          "type": { "type": "string", "example": "https://api.oceanpearlbahamas.com/errors/room-collision" },
+          "title": { "type": "string", "example": "Room Collision Detected" },
+          "status": { "type": "integer", "example": 409 },
+          "detail": { "type": "string", "example": "Villa 101 is already allocated during the requested date window." },
+          "instance": { "type": "string", "example": "/api/v1/bookings" },
+          "invalid_params": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "reason": { "type": "string" }
+              }
+            }
+          }
+        }
+      },
+      "BookingStatus": {
+        "type": "string",
+        "enum": ["pending_hold", "confirmed", "checked_in", "checked_out", "cancelled", "no_show"]
+      },
+      "RoomStatus": {
+        "type": "string",
+        "enum": ["vacant_clean", "vacant_dirty", "occupied_clean", "occupied_dirty", "out_of_order", "maintenance_hold", "vip_in_house"]
+      },
+      "RoomTier": {
+        "type": "string",
+        "enum": ["oceanfront_villa", "overwater_bungalow", "royal_palm_suite", "beachfront_cottage", "gardenview_deluxe"]
+      },
+      "TaskStatus": {
+        "type": "string",
+        "enum": ["dirty", "in_progress", "inspected", "clean"]
+      },
+      "MaintenanceSeverity": {
+        "type": "string",
+        "enum": ["p1_urgent", "p2_standard", "p3_preventative"]
+      },
+      "MaintenanceStatus": {
+        "type": "string",
+        "enum": ["open", "in_progress", "resolved", "closed"]
+      },
+      "PaymentMethod": {
+        "type": "string",
+        "enum": ["cash_bsd", "cash_usd", "credit_card", "wire_transfer", "gift_certificate"]
+      },
+      "CreateBookingDto": {
+        "type": "object",
+        "required": ["property_id", "guest_id", "room_category_id", "rate_plan_id", "check_in_date", "check_out_date", "adults"],
+        "properties": {
+          "property_id": { "type": "string", "format": "uuid" },
+          "guest_id": { "type": "string", "format": "uuid" },
+          "room_category_id": { "type": "string", "format": "uuid" },
+          "rate_plan_id": { "type": "string", "format": "uuid" },
+          "room_id": { "type": "string", "format": "uuid", "nullable": true },
+          "check_in_date": { "type": "string", "format": "date", "example": "2026-12-15" },
+          "check_out_date": { "type": "string", "format": "date", "example": "2026-12-20" },
+          "adults": { "type": "integer", "minimum": 1, "example": 2 },
+          "children": { "type": "integer", "default": 0 },
+          "special_requests": { "type": "string", "example": "Honeymoon welcome champagne" }
+        }
+      },
+      "CollisionCheckDto": {
+        "type": "object",
+        "required": ["room_id", "check_in_date", "check_out_date"],
+        "properties": {
+          "room_id": { "type": "string", "format": "uuid" },
+          "check_in_date": { "type": "string", "format": "date" },
+          "check_out_date": { "type": "string", "format": "date" },
+          "exclude_booking_id": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "CollisionCheckResult": {
+        "type": "object",
+        "required": ["has_collision"],
+        "properties": {
+          "has_collision": { "type": "boolean", "example": false },
+          "conflicting_booking_id": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "CheckInDto": {
+        "type": "object",
+        "required": ["digital_signature_url", "keycard_rfid_uid"],
+        "properties": {
+          "digital_signature_url": { "type": "string", "example": "https://storage.oceanpearlbahamas.com/signatures/bhr-8821.png" },
+          "keycard_rfid_uid": { "type": "string", "example": "RFID-88492019" },
+          "credit_card_preauth_ref": { "type": "string", "example": "AUTH-VISA-99402" }
+        }
+      },
+      "RoomMoveDto": {
+        "type": "object",
+        "required": ["target_room_id", "reason"],
+        "properties": {
+          "target_room_id": { "type": "string", "format": "uuid" },
+          "reason": { "type": "string", "example": "Guest upgraded to Sovereign Oceanfront Villa." }
+        }
+      },
+      "BookingDetail": {
+        "type": "object",
+        "required": ["id", "confirmation_number", "check_in_date", "check_out_date", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "confirmation_number": { "type": "string", "example": "BHR-2026-8821" },
+          "check_in_date": { "type": "string", "format": "date" },
+          "check_out_date": { "type": "string", "format": "date" },
+          "adults": { "type": "integer" },
+          "children": { "type": "integer" },
+          "status": { "$ref": "#/components/schemas/BookingStatus" },
+          "room_number": { "type": "string", "example": "Villa 101" },
+          "category_name": { "type": "string", "example": "Sovereign Oceanfront Estate Villa" },
+          "guest_name": { "type": "string", "example": "Lord Harrison Montague" }
+        }
+      },
+      "RoomMatrixPayload": {
+        "type": "object",
+        "required": ["start_date", "end_date", "rooms"],
+        "properties": {
+          "start_date": { "type": "string", "format": "date" },
+          "end_date": { "type": "string", "format": "date" },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "room_id": { "type": "string", "format": "uuid" },
+                "room_number": { "type": "string" },
+                "tier": { "$ref": "#/components/schemas/RoomTier" },
+                "current_status": { "$ref": "#/components/schemas/RoomStatus" },
+                "grid_slots": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "date": { "type": "string", "format": "date" },
+                      "booking_id": { "type": "string", "format": "uuid", "nullable": true },
+                      "guest_name": { "type": "string", "nullable": true },
+                      "status": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "FolioDetail": {
+        "type": "object",
+        "required": ["id", "folio_type", "status", "currency", "balance_bsd", "transactions"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "folio_type": { "type": "string", "example": "room_master" },
+          "status": { "type": "string", "example": "active" },
+          "currency": { "type": "string", "example": "BSD" },
+          "balance_bsd": { "type": "number", "example": 4485.00 },
+          "transactions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/FolioTransaction" }
+          }
+        }
+      },
+      "FolioTransaction": {
+        "type": "object",
+        "required": ["id", "description", "subtotal_bsd", "vat_amount_bsd", "service_charge_amount_bsd", "hotel_levy_amount_bsd", "total_amount_bsd"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "transaction_type": { "type": "string", "example": "room_charge" },
+          "description": { "type": "string", "example": "Nightly Lodging: Sovereign Oceanfront Estate Villa (101)" },
+          "subtotal_bsd": { "type": "number", "example": 3450.00 },
+          "vat_rate": { "type": "number", "example": 0.100 },
+          "vat_amount_bsd": { "type": "number", "example": 345.00 },
+          "resort_service_charge_pct": { "type": "number", "example": 0.100 },
+          "service_charge_amount_bsd": { "type": "number", "example": 345.00 },
+          "hotel_levy_pct": { "type": "number", "example": 0.100 },
+          "hotel_levy_amount_bsd": { "type": "number", "example": 345.00 },
+          "total_amount_bsd": { "type": "number", "example": 4485.00 },
+          "odd_penny_rounding_bsd": { "type": "number", "example": 0.00 },
+          "posted_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PostFolioChargeDto": {
+        "type": "object",
+        "required": ["transaction_type", "description", "subtotal_bsd"],
+        "properties": {
+          "transaction_type": { "type": "string", "example": "fnb_charge" },
+          "description": { "type": "string", "example": "Sunset Pier Dinner Party (Check #4920)" },
+          "subtotal_bsd": { "type": "number", "example": 680.00 },
+          "source_reference_id": { "type": "string", "example": "POS-ORD-88192" }
+        }
+      },
+      "SettleFolioDto": {
+        "type": "object",
+        "required": ["tenders"],
+        "properties": {
+          "tenders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["payment_method", "amount_bsd"],
+              "properties": {
+                "payment_method": { "$ref": "#/components/schemas/PaymentMethod" },
+                "amount_bsd": { "type": "number", "example": 2485.00 },
+                "card_last_four": { "type": "string", "example": "4920" },
+                "authorization_code": { "type": "string", "example": "AUTH-49201" }
+              }
+            }
+          }
+        }
+      },
+      "TaxInvoicePayload": {
+        "type": "object",
+        "required": ["resort_name", "tax_tin", "confirmation_number", "guest_name", "room_number", "subtotal_pre_tax", "bahamas_vat_10pct", "resort_service_charge_10pct", "hotel_levy_10pct", "grand_total_bsd"],
+        "properties": {
+          "resort_name": { "type": "string", "example": "The Royal Bahamian Ocean Resort & Private Cay" },
+          "tax_tin": { "type": "string", "example": "VAT-10084920-BS" },
+          "confirmation_number": { "type": "string", "example": "BHR-2026-8821" },
+          "guest_name": { "type": "string", "example": "Lord Harrison Montague" },
+          "room_number": { "type": "string", "example": "Villa 101" },
+          "subtotal_pre_tax": { "type": "number", "example": 3450.00 },
+          "bahamas_vat_10pct": { "type": "number", "example": 345.00 },
+          "resort_service_charge_10pct": { "type": "number", "example": 345.00 },
+          "hotel_levy_10pct": { "type": "number", "example": 345.00 },
+          "grand_total_bsd": { "type": "number", "example": 4485.00 }
+        }
+      },
+      "HousekeepingTaskDetail": {
+        "type": "object",
+        "required": ["id", "room_id", "task_type", "priority", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "room_number": { "type": "string", "example": "Cottage 301" },
+          "task_type": { "type": "string", "example": "departure_clean" },
+          "priority": { "type": "string", "example": "urgent_vip" },
+          "status": { "$ref": "#/components/schemas/TaskStatus" },
+          "assigned_attendant": { "type": "string", "example": "Marva Knowles" }
+        }
+      },
+      "MaintenanceTicketDetail": {
+        "type": "object",
+        "required": ["id", "title", "severity", "status", "causes_ooo"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "room_number": { "type": "string", "example": "Room 102" },
+          "title": { "type": "string", "example": "Chilled Water Chiller Fan Coil Breakdown" },
+          "severity": { "$ref": "#/components/schemas/MaintenanceSeverity" },
+          "status": { "$ref": "#/components/schemas/MaintenanceStatus" },
+          "causes_ooo": { "type": "boolean", "example": true }
+        }
+      },
+      "CreateMaintenanceTicketDto": {
+        "type": "object",
+        "required": ["property_id", "title", "description", "category", "severity"],
+        "properties": {
+          "property_id": { "type": "string", "format": "uuid" },
+          "room_id": { "type": "string", "format": "uuid", "nullable": true },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string", "example": "ac_cooling" },
+          "severity": { "$ref": "#/components/schemas/MaintenanceSeverity" },
+          "causes_ooo": { "type": "boolean", "default": false }
+        }
+      },
+      "ChargeRoomFolioDto": {
+        "type": "object",
+        "required": ["room_number", "guest_surname"],
+        "properties": {
+          "room_number": { "type": "string", "example": "Villa 101" },
+          "guest_surname": { "type": "string", "example": "Montague" },
+          "tip_percent": { "type": "number", "example": 18.00 }
+        }
+      },
+      "ConciergeBookingDetail": {
+        "type": "object",
+        "required": ["id", "experience_name", "excursion_date", "retail_price_bsd", "status"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "experience_name": { "type": "string", "example": "Private 65ft Sunseeker Exuma Cays Swimming Pigs Day Expedition" },
+          "excursion_date": { "type": "string", "format": "date" },
+          "retail_price_bsd": { "type": "number", "example": 4800.00 },
+          "commission_amount_bsd": { "type": "number", "example": 960.00 },
+          "status": { "type": "string", "example": "confirmed" }
+        }
+      },
+      "CreateConciergeBookingDto": {
+        "type": "object",
+        "required": ["booking_id", "vendor_id", "experience_name", "excursion_date", "start_time", "guests_count", "retail_price_bsd"],
+        "properties": {
+          "booking_id": { "type": "string", "format": "uuid" },
+          "vendor_id": { "type": "string", "format": "uuid" },
+          "experience_name": { "type": "string" },
+          "excursion_date": { "type": "string", "format": "date" },
+          "start_time": { "type": "string", "example": "08:30:00" },
+          "duration_hours": { "type": "number", "default": 4.0 },
+          "guests_count": { "type": "integer", "minimum": 1 },
+          "retail_price_bsd": { "type": "number" },
+          "charge_to_room_folio": { "type": "boolean", "default": true }
+        }
+      },
+      "DailyFlashReportPayload": {
+        "type": "object",
+        "required": ["property_name", "total_rooms", "rooms_available", "rooms_sold", "rooms_ooo", "occupancy_pct", "room_revenue_bsd", "adr_bsd", "revpar_bsd", "total_revenue_bsd"],
+        "properties": {
+          "property_name": { "type": "string", "example": "The Royal Bahamian Ocean Resort & Private Cay" },
+          "report_date": { "type": "string", "format": "date", "example": "2026-11-14" },
+          "total_rooms": { "type": "integer", "example": 5 },
+          "rooms_available": { "type": "integer", "example": 4 },
+          "rooms_sold": { "type": "integer", "example": 2 },
+          "rooms_ooo": { "type": "integer", "example": 1 },
+          "occupancy_pct": { "type": "number", "example": 50.00 },
+          "room_revenue_bsd": { "type": "number", "example": 5400.00 },
+          "adr_bsd": { "type": "number", "example": 2700.00 },
+          "revpar_bsd": { "type": "number", "example": 1350.00 },
+          "fnb_revenue_bsd": { "type": "number", "example": 1280.00 },
+          "total_revenue_bsd": { "type": "number", "example": 6680.00 }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation error or invalid request parameters",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing, expired, or invalid Supabase JWT authentication token",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Requested resort resource was not found",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Resource conflict or physical accommodation collision",
+        "content": {
+          "application/problem+json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetails" }
+          }
+        }
+      }
+    }
+  }
+}
